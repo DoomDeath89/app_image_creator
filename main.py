@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 import tkinter as tk
 from tkinter import filedialog, scrolledtext, messagebox, ttk
@@ -81,6 +82,18 @@ class AppImageBuilderTk:
         button_frame.pack(fill=tk.X, pady=10)
         ttk.Button(button_frame, text="Generate AppImage", command=self.build_appimage).pack()
 
+        # linuxdeploy status and installer
+        linuxdeploy_frame = ttk.Frame(build_frame)
+        linuxdeploy_frame.pack(fill=tk.X, pady=5)
+        self.linuxdeploy_status_label = ttk.Label(linuxdeploy_frame, text="")
+        self.linuxdeploy_status_label.pack(side=tk.LEFT)
+        self.install_linuxdeploy_button = ttk.Button(
+            linuxdeploy_frame,
+            text="Install linuxdeploy",
+            command=self.prompt_install_linuxdeploy
+        )
+        self.install_linuxdeploy_button.pack(side=tk.RIGHT)
+
         # Log
         ttk.Label(build_frame, text="Build Log:").pack(anchor=tk.W, pady=(10, 5))
         self.log_text = scrolledtext.ScrolledText(build_frame, width=85, height=15)
@@ -121,6 +134,8 @@ Comment=A sample application
 
         # Set focus to first field
         self.exe_entry.focus()
+
+        self.update_linuxdeploy_status()
 
     def select_executable(self):
         path = filedialog.askopenfilename(title="Select executable", filetypes=[("All files", "*")])
@@ -200,6 +215,79 @@ Comment=A sample application
         process.wait()
         return process.returncode, output
 
+    def update_linuxdeploy_status(self):
+        available = shutil.which("linuxdeploy") is not None
+        if available:
+            self.linuxdeploy_status_label.config(text="linuxdeploy: available", foreground="green")
+            self.install_linuxdeploy_button.config(state=tk.DISABLED)
+        else:
+            self.linuxdeploy_status_label.config(text="linuxdeploy: not found", foreground="red")
+            self.install_linuxdeploy_button.config(state=tk.NORMAL)
+
+    def get_linuxdeploy_url(self):
+        arch = platform.machine().lower()
+        if arch in {"aarch64", "arm64"}:
+            return "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-aarch64.AppImage"
+        if arch in {"x86_64", "amd64"}:
+            return "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-x86_64.AppImage"
+        return None
+
+    def prompt_install_linuxdeploy(self):
+        if self.ensure_linuxdeploy_available(show_already_installed=True):
+            return
+
+    def ensure_linuxdeploy_available(self, show_already_installed=False):
+        if shutil.which("linuxdeploy"):
+            if show_already_installed:
+                messagebox.showinfo("Info", "linuxdeploy is already installed.")
+            self.update_linuxdeploy_status()
+            return True
+
+        if not messagebox.askyesno(
+            "Install linuxdeploy",
+            "linuxdeploy is not installed. Download and install it now?"
+        ):
+            return False
+
+        return self.install_linuxdeploy()
+
+    def install_linuxdeploy(self):
+        url = self.get_linuxdeploy_url()
+        if not url:
+            messagebox.showerror(
+                "Error",
+                "Unsupported CPU architecture for automatic install."
+            )
+            return False
+
+        if not shutil.which("pkexec"):
+            messagebox.showerror(
+                "Error",
+                "pkexec not found. Install policykit or run install_appimage_tools.sh manually."
+            )
+            return False
+
+        self.log_message("Installing linuxdeploy...")
+        install_cmd = [
+            "pkexec",
+            "bash",
+            "-c",
+            "set -e; TMP_DIR=$(mktemp -d); cd \"$TMP_DIR\"; "
+            f"wget -c \"{url}\" -O linuxdeploy.AppImage; "
+            "chmod +x linuxdeploy.AppImage; "
+            "mv linuxdeploy.AppImage /usr/local/bin/linuxdeploy; "
+            "cd ~; rm -rf \"$TMP_DIR\""
+        ]
+        ret, output = self.run_command(install_cmd)
+        if ret != 0:
+            self.log_message("linuxdeploy installation failed.")
+            messagebox.showerror("Error", "linuxdeploy installation failed. Check the log for details.")
+            return False
+
+        self.log_message("linuxdeploy installed successfully.")
+        self.update_linuxdeploy_status()
+        return True
+
     def build_appimage(self):
         exe = self.exe_entry.get().strip()
         icon = self.icon_entry.get().strip()
@@ -273,9 +361,10 @@ exec "$HERE/usr/bin/{exe_name}" "$@"
 
         # Check if linuxdeploy is available
         if not shutil.which("linuxdeploy"):
-            self.log_message("linuxdeploy not found in PATH. Please install it to continue.")
-            messagebox.showerror("Error", "linuxdeploy not found. Please install it to create AppImages.")
-            return
+            self.log_message("linuxdeploy not found in PATH.")
+            if not self.ensure_linuxdeploy_available():
+                messagebox.showerror("Error", "linuxdeploy not found. Please install it to create AppImages.")
+                return
 
         # Run linuxdeploy
         self.log_message("Running linuxdeploy to detect dependencies...")
