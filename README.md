@@ -34,6 +34,23 @@ Or run directly:
 python3 main.py
 ```
 
+
+## Launcher Script: run_appimager.sh
+
+This script ensures a Python virtual environment exists in ./venv, creates it if missing, activates it, and runs run_app.py.
+
+Usage:
+
+```bash
+./run_appimager.sh
+```
+
+Steps:
+- Checks for ./venv directory.
+- Creates venv if not found.
+- Activates the virtual environment.
+- Runs run_app.py with Python.
+
 ## Executable (arm64)
 
 Download the binary from the release and give it permissions:
