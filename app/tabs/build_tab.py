@@ -4,41 +4,15 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog, scrolledtext, messagebox, ttk
 import shutil
-from dependencies_tab import DependenciesTab
 
-
-class AppImageBuilderTk:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("AppImage Builder")
-        self.root.geometry("800x600")
-        self.root.configure(bg='#f0f0f0')
-
-        # Style configuration
-        style = ttk.Style()
-        style.configure('TFrame', background='#f0f0f0')
-        style.configure('TLabel', background='#f0f0f0', font=('Arial', 10))
-        style.configure('TButton', font=('Arial', 10))
-        style.configure('Header.TLabel', font=('Arial', 12, 'bold'))
-
-        # Main frame
-        main_frame = ttk.Frame(root, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        # Title
-        title_label = ttk.Label(main_frame, text="AppImage Builder", style='Header.TLabel')
-        title_label.pack(pady=(0, 10))
-
-        # Notebook for tabs
-        notebook = ttk.Notebook(main_frame)
-        notebook.pack(fill=tk.BOTH, expand=True, pady=5)
-
-        # Build Tab
-        build_frame = ttk.Frame(notebook, padding="10")
-        notebook.add(build_frame, text="Build AppImage")
+class BuildTab:
+    def __init__(self, notebook, app):
+        self.app = app
+        self.frame = ttk.Frame(notebook, padding="10")
+        notebook.add(self.frame, text="Build AppImage")
 
         # Executable
-        exe_frame = ttk.Frame(build_frame)
+        exe_frame = ttk.Frame(self.frame)
         exe_frame.pack(fill=tk.X, pady=5)
         ttk.Label(exe_frame, text="Executable:").pack(anchor=tk.W)
         self.exe_entry = ttk.Entry(exe_frame, width=70)
@@ -46,7 +20,7 @@ class AppImageBuilderTk:
         ttk.Button(exe_frame, text="Browse", command=self.select_executable).pack(side=tk.RIGHT)
 
         # Icon
-        icon_frame = ttk.Frame(build_frame)
+        icon_frame = ttk.Frame(self.frame)
         icon_frame.pack(fill=tk.X, pady=5)
         ttk.Label(icon_frame, text="Icon (.png):").pack(anchor=tk.W)
         self.icon_entry = ttk.Entry(icon_frame, width=70)
@@ -54,7 +28,7 @@ class AppImageBuilderTk:
         ttk.Button(icon_frame, text="Browse", command=self.select_icon).pack(side=tk.RIGHT)
 
         # Metadata
-        metadata_frame = ttk.Frame(build_frame)
+        metadata_frame = ttk.Frame(self.frame)
         metadata_frame.pack(fill=tk.X, pady=5)
 
         ttk.Label(metadata_frame, text="App Name:").grid(row=0, column=0, sticky=tk.W, pady=2)
@@ -79,12 +53,12 @@ class AppImageBuilderTk:
         self.comment_entry.insert(0, "App created with AppImage Builder")
 
         # Generate button
-        button_frame = ttk.Frame(build_frame)
+        button_frame = ttk.Frame(self.frame)
         button_frame.pack(fill=tk.X, pady=10)
         ttk.Button(button_frame, text="Generate AppImage", command=self.build_appimage).pack()
 
         # linuxdeploy status and installer
-        linuxdeploy_frame = ttk.Frame(build_frame)
+        linuxdeploy_frame = ttk.Frame(self.frame)
         linuxdeploy_frame.pack(fill=tk.X, pady=5)
         self.linuxdeploy_status_label = ttk.Label(linuxdeploy_frame, text="")
         self.linuxdeploy_status_label.pack(side=tk.LEFT)
@@ -96,58 +70,19 @@ class AppImageBuilderTk:
         self.install_linuxdeploy_button.pack(side=tk.RIGHT)
 
         # Log
-        ttk.Label(build_frame, text="Build Log:").pack(anchor=tk.W, pady=(10, 5))
-        self.log_text = scrolledtext.ScrolledText(build_frame, width=85, height=15)
+        ttk.Label(self.frame, text="Build Log:").pack(anchor=tk.W, pady=(10, 5))
+        self.log_text = scrolledtext.ScrolledText(self.frame, width=85, height=15)
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
-        # Desktop File Validator Tab
-        validator_frame = ttk.Frame(notebook, padding="10")
-        notebook.add(validator_frame, text="Desktop File Validator")
-
-        # Dependencies Tab (modular)
-        self.dependencies_tab = DependenciesTab(notebook)
-
-        ttk.Label(validator_frame, text="Desktop File Content:").pack(anchor=tk.W, pady=(0, 5))
-        self.desktop_text = scrolledtext.ScrolledText(validator_frame, width=85, height=12)
-        self.desktop_text.pack(fill=tk.BOTH, expand=True)
-
-        # Add sample desktop file
-        sample_desktop = """[Desktop Entry]
-Name=My Application
-Exec=myapp
-Icon=myapp
-Type=Application
-Categories=Utility;
-Comment=A sample application
-"""
-        self.desktop_text.insert(tk.END, sample_desktop)
-
-        # Validation button and result
-        validator_btn_frame = ttk.Frame(validator_frame)
-        validator_btn_frame.pack(fill=tk.X, pady=10)
-        ttk.Button(validator_btn_frame, text="Validate Desktop File",
-                   command=self.validate_desktop_file).pack(side=tk.LEFT)
-        self.validation_result = ttk.Label(validator_btn_frame, text="", foreground="red")
-        self.validation_result.pack(side=tk.LEFT, padx=10)
-
-        # Status bar
-        self.status_var = tk.StringVar()
-        self.status_var.set("Ready")
-        status_bar = ttk.Label(root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
-
-        # Set focus to first field
         self.exe_entry.focus()
-
         self.update_linuxdeploy_status()
 
+    # Métodos migrados (select_executable, select_icon, log_message, update_linuxdeploy_status, etc.)
     def select_executable(self):
         path = filedialog.askopenfilename(title="Select executable", filetypes=[("All files", "*")])
         if path:
             self.exe_entry.delete(0, tk.END)
             self.exe_entry.insert(0, path)
-
-            # Suggest a name based on the executable filename
             if not self.name_entry.get():
                 name = os.path.splitext(os.path.basename(path))[0]
                 self.name_entry.insert(0, name)
@@ -161,63 +96,10 @@ Comment=A sample application
     def log_message(self, message):
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
-        self.root.update()
-        self.status_var.set(message)
-
-    def validate_desktop_file(self):
-        content = self.desktop_text.get("1.0", tk.END)
-        lines = content.split('\n')
-        errors = []
-        warnings = []
-
-        # Check for required fields
-        required_fields = ['Name', 'Exec', 'Type', 'Categories']
-        present_fields = []
-
-        for line in lines:
-            line = line.strip()
-            if '=' in line:
-                key = line.split('=')[0].strip()
-                if key in required_fields:
-                    present_fields.append(key)
-
-                # Validate Categories field
-                if key == 'Categories':
-                    value = line.split('=')[1].strip()
-                    if value.endswith(';'):
-                        value = value[:-1]
-                    if value not in ['Game', 'Utility', 'Development', 'AudioVideo', 'Audio', 'Video',
-                                     'Graphics', 'Office', 'Network', 'Education', 'System']:
-                        warnings.append(
-                            f"Category '{value}' is not a standard category. Consider using one of the standard categories.")
-
-        # Check for missing required fields
-        for field in required_fields:
-            if field not in present_fields:
-                errors.append(f"Missing required field: {field}")
-
-        # Show results
-        if errors:
-            self.validation_result.config(text="Validation FAILED: " + "; ".join(errors), foreground="red")
-        elif warnings:
-            self.validation_result.config(text="Validation PASSED with warnings: " + "; ".join(warnings),
-                                          foreground="orange")
-        else:
-            self.validation_result.config(text="Validation PASSED", foreground="green")
-
-        return len(errors) == 0
-
-    def run_command(self, cmd):
-        self.log_message(f"Executing: {' '.join(cmd)}")
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        output = ""
-        for line in iter(process.stdout.readline, ''):
-            if line:
-                output += line
-                self.log_message(line.strip())
-        process.stdout.close()
-        process.wait()
-        return process.returncode, output
+        self.frame.update()
+        # Si necesitas actualizar status_var, puedes hacerlo desde app
+        if hasattr(self.app, 'status_var'):
+            self.app.status_var.set(message)
 
     def update_linuxdeploy_status(self):
         available = shutil.which("linuxdeploy") is not None
@@ -227,14 +109,6 @@ Comment=A sample application
         else:
             self.linuxdeploy_status_label.config(text="linuxdeploy: not found", foreground="red")
             self.install_linuxdeploy_button.config(state=tk.NORMAL)
-
-    def get_linuxdeploy_url(self):
-        arch = platform.machine().lower()
-        if arch in {"aarch64", "arm64"}:
-            return "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-aarch64.AppImage"
-        if arch in {"x86_64", "amd64"}:
-            return "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-x86_64.AppImage"
-        return None
 
     def prompt_install_linuxdeploy(self):
         if self.ensure_linuxdeploy_available(show_already_installed=True):
@@ -292,6 +166,26 @@ Comment=A sample application
         self.update_linuxdeploy_status()
         return True
 
+    def get_linuxdeploy_url(self):
+        arch = platform.machine().lower()
+        if arch in {"aarch64", "arm64"}:
+            return "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-aarch64.AppImage"
+        if arch in {"x86_64", "amd64"}:
+            return "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-x86_64.AppImage"
+        return None
+
+    def run_command(self, cmd):
+        self.log_message(f"Executing: {' '.join(cmd)}")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        output = ""
+        for line in iter(process.stdout.readline, ''):
+            if line:
+                output += line
+                self.log_message(line.strip())
+        process.stdout.close()
+        process.wait()
+        return process.returncode, output
+
     def build_appimage(self):
         exe = self.exe_entry.get().strip()
         icon = self.icon_entry.get().strip()
@@ -307,27 +201,24 @@ Comment=A sample application
         if not os.path.exists(exe):
             messagebox.showerror("Error", f"Executable file not found: {exe}")
             return
-            # Collect dependencies from dependencies tab
-            dependencies = self.dependencies_tab.get_dependencies()
+        if not os.path.exists(icon):
             messagebox.showerror("Error", f"Icon file not found: {icon}")
             return
 
-        # Validate the desktop file content before proceeding
-        desktop_content = f"""[Desktop Entry]
-Name={name}
-Exec={name}
-Icon={name}
-Type=Application
-Categories={category};
-Comment={comment}
-Version={version}
-"""
-        self.desktop_text.delete("1.0", tk.END)
-        self.desktop_text.insert(tk.END, desktop_content)
+        # Collect dependencies from dependencies tab
+        dependencies = []
+        if hasattr(self.app, 'dependencies_tab'):
+            dependencies = self.app.dependencies_tab.get_dependencies()
 
-        if not self.validate_desktop_file():
-            messagebox.showerror("Error", "Desktop file validation failed. Please fix the errors before building.")
-            return
+        # Validate the desktop file content before proceeding
+        desktop_content = f"""[Desktop Entry]\nName={name}\nExec={name}\nIcon={name}\nType=Application\nCategories={category};\nComment={comment}\nVersion={version}\n"""
+        if hasattr(self.app, 'desktop_text'):
+            self.app.desktop_text.delete("1.0", tk.END)
+            self.app.desktop_text.insert(tk.END, desktop_content)
+            if hasattr(self.app, 'validate_desktop_file'):
+                if not self.app.validate_desktop_file():
+                    messagebox.showerror("Error", "Desktop file validation failed. Please fix the errors before building.")
+                    return
 
         appdir = f"{name}.AppDir"
         self.log_message(f"Creating AppDir in {appdir}")
@@ -353,11 +244,7 @@ Version={version}
         self.log_message(f"Desktop file created at {desktop_path}")
 
         # Create AppRun
-        apprun_content = f"""#!/bin/bash
-HERE="$(dirname "$(readlink -f "${{0}}")")"
-export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
-exec "$HERE/usr/bin/{exe_name}" "$@"
-"""
+        apprun_content = f"""#!/bin/bash\nHERE=\"$(dirname \"$(readlink -f \"${{0}}\")\")\"\nexport LD_LIBRARY_PATH=\"$HERE/usr/lib:$LD_LIBRARY_PATH\"\nexec \"$HERE/usr/bin/{exe_name}\" \"$@\"\n"""
         apprun_path = f"{appdir}/AppRun"
         with open(apprun_path, "w") as f:
             f.write(apprun_content)
@@ -390,9 +277,3 @@ exec "$HERE/usr/bin/{exe_name}" "$@"
 
         self.log_message("AppImage generated successfully!")
         messagebox.showinfo("Success", "AppImage generated successfully!")
-
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = AppImageBuilderTk(root)
-    root.mainloop()
