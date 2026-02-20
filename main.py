@@ -4,6 +4,7 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog, scrolledtext, messagebox, ttk
 import shutil
+from dependencies_tab import DependenciesTab
 
 
 class AppImageBuilderTk:
@@ -102,6 +103,9 @@ class AppImageBuilderTk:
         # Desktop File Validator Tab
         validator_frame = ttk.Frame(notebook, padding="10")
         notebook.add(validator_frame, text="Desktop File Validator")
+
+        # Dependencies Tab (modular)
+        self.dependencies_tab = DependenciesTab(notebook)
 
         ttk.Label(validator_frame, text="Desktop File Content:").pack(anchor=tk.W, pady=(0, 5))
         self.desktop_text = scrolledtext.ScrolledText(validator_frame, width=85, height=12)
@@ -303,8 +307,8 @@ Comment=A sample application
         if not os.path.exists(exe):
             messagebox.showerror("Error", f"Executable file not found: {exe}")
             return
-
-        if not os.path.exists(icon):
+            # Collect dependencies from dependencies tab
+            dependencies = self.dependencies_tab.get_dependencies()
             messagebox.showerror("Error", f"Icon file not found: {icon}")
             return
 
@@ -341,6 +345,7 @@ Version={version}
         self.run_command(["cp", exe, f"{appdir}/usr/bin/"])
         self.run_command(["cp", icon, f"{appdir}/usr/share/icons/hicolor/256x256/apps/{name}.png"])
 
+        os.makedirs(f"{appdir}/usr/lib", exist_ok=True)
         # Create desktop file
         desktop_path = f"{appdir}/usr/share/applications/{name}.desktop"
         with open(desktop_path, "w") as f:
