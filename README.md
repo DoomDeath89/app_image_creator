@@ -1,25 +1,26 @@
+
 # AppImage Builder
 
-GUI en Tkinter para crear AppImages usando linuxdeploy. Incluye un validador simple de archivos .desktop y un boton para instalar linuxdeploy si no esta disponible.
+Tkinter GUI to create AppImages using linuxdeploy. Includes a simple .desktop file validator and a button to install linuxdeploy if not available.
 
 ## Download
 
 - Release arm64 (PyInstaller onefile): https://github.com/DoomDeath89/app_image_creator/releases/tag/1.0.0
-- Checksum SHA256: https://github.com/DoomDeath89/app_image_creator/releases/tag/1.0.0
+- SHA256 checksum: https://github.com/DoomDeath89/app_image_creator/releases/tag/1.0.0
 
-## Capturas
+## Screenshots
 
-Agrega capturas en `docs/screenshots/` y enlazalas aqui cuando esten listas.
+Add screenshots in `docs/screenshots/` and link them here when ready.
 
-## Requisitos
+## Requirements
 
 - Python 3
-- Tkinter (normalmente viene con la instalacion de Python en Linux)
-- linuxdeploy (se puede instalar desde la GUI o con el script)
+- Tkinter (usually included with Python installation on Linux)
+- linuxdeploy (can be installed from the GUI or with the script)
 
-## Ejecutar desde codigo fuente
+## Run from source code
 
-Si deseas usar un entorno virtual:
+If you want to use a virtual environment:
 
 ```bash
 python3 -m venv venv
@@ -27,42 +28,60 @@ source venv/bin/activate
 python3 main.py
 ```
 
-O ejecutar directamente:
+Or run directly:
 
 ```bash
 python3 main.py
 ```
 
-## Ejecutable (arm64)
 
-Descarga el binario desde la release y dale permisos:
+## Launcher Script: run_appimager.sh
+
+This script ensures a Python virtual environment exists in ./venv, creates it if missing, activates it, and runs run_app.py.
+
+Usage:
+
+```bash
+./run_appimager.sh
+```
+
+Steps:
+- Checks for ./venv directory.
+- Creates venv if not found.
+- Activates the virtual environment.
+- Runs run_app.py with Python.
+
+## Executable (arm64)
+
+Download the binary from the release and give it permissions:
 
 ```bash
 chmod +x AppImageBuilder
 ./AppImageBuilder
 ```
 
-## Instalar linuxdeploy
+## Install linuxdeploy
 
-Opcion 1: desde la GUI
+Option 1: from the GUI
 
-- Si no esta instalado, el boton "Install linuxdeploy" permite descargar e instalar con confirmacion.
+- If not installed, the "Install linuxdeploy" button allows you to download and install with confirmation.
 
-Opcion 2: con el script
+Option 2: with the script
 
 ```bash
 ./install_appimage_tools.sh
 ```
 
-## Publicacion en directorios
+## Publishing in directories
 
-- Considera publicar en AppImageHub/AppImage Catalog cuando tengas un AppImage publico.
+- Consider publishing in AppImageHub/AppImage Catalog when you have a public AppImage.
 
-## Notas
 
-- El AppDir se crea como `<AppName>.AppDir` y se sobrescribe si ya existe.
-- La version por defecto es 1.0 si no se especifica.
+## Notes
 
-## Licencia
+- The AppDir is created as `<AppName>.AppDir` and will be overwritten if it already exists.
+- The default version is 1.0 if not specified.
 
-MIT. Ver LICENSE.
+## License
+
+MIT. See LICENSE.

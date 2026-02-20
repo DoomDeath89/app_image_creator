@@ -3,7 +3,8 @@ from tkinter import ttk
 import os
 
 class DependenciesTab:
-    def __init__(self, notebook):
+    def __init__(self, notebook, mediator):
+        self.mediator = mediator
         self.frame = ttk.Frame(notebook, padding="10")
         notebook.add(self.frame, text="Dependencies")
 
