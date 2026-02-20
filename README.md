@@ -59,11 +59,12 @@ Option 2: with the script
 
 - Consider publishing in AppImageHub/AppImage Catalog when you have a public AppImage.
 
-## Notas
 
-- El AppDir se crea como `<AppName>.AppDir` y se sobrescribe si ya existe.
-- La version por defecto es 1.0 si no se especifica.
+## Notes
 
-## Licencia
+- The AppDir is created as `<AppName>.AppDir` and will be overwritten if it already exists.
+- The default version is 1.0 if not specified.
 
-MIT. Ver LICENSE.
+## License
+
+MIT. See LICENSE.
