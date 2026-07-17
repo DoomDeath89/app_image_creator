@@ -3,40 +3,42 @@ from unittest.mock import MagicMock
 import tkinter as tk
 from tkinter import ttk
 from app.tabs.validator_tab import ValidatorTab
+from app.core.mediator import Mediator
 
-class DummyMediator:
-    def update_status(self, msg):
-        pass
 
 class TestValidatorTab(unittest.TestCase):
     def setUp(self):
         self.root = tk.Tk()
         self.notebook = ttk.Notebook(self.root)
-        self.mediator = DummyMediator()
+        self.mediator = MagicMock(spec=Mediator)
         self.tab = ValidatorTab(self.notebook, self.mediator)
 
     def tearDown(self):
         self.root.destroy()
 
     def test_insert_sample_desktop(self):
-        # Prueba que se inserta el archivo desktop de ejemplo
-        content = self.tab.desktop_text.get("1.0", "end")
+        content = self.tab.get_content()
         self.assertIn("[Desktop Entry]", content)
         self.assertIn("Name=My Application", content)
 
-    def test_validate_desktop_file_valid(self):
-        # Prueba la validación de un archivo desktop válido
-        self.tab.desktop_text.delete("1.0", "end")
-        self.tab.desktop_text.insert("1.0", "[Desktop Entry]\nName=Test\nExec=test\nType=Application\nCategories=Utility;")
-        result = self.tab.validate_desktop_file()
-        self.assertTrue(result)
+    def test_set_content(self):
+        new_content = "[Desktop Entry]\nName=NewApp\nExec=newapp\nType=Application\nCategories=Utility;"
+        self.tab.set_content(new_content)
+        content = self.tab.get_content()
+        self.assertIn("Name=NewApp", content)
 
-    def test_validate_desktop_file_missing_field(self):
-        # Prueba la validación de un archivo desktop con campos faltantes
-        self.tab.desktop_text.delete("1.0", "end")
-        self.tab.desktop_text.insert("1.0", "[Desktop Entry]\nExec=test\nType=Application\nCategories=Utility;")
-        result = self.tab.validate_desktop_file()
-        self.assertFalse(result)
+    def test_validate_valid(self):
+        self.tab.set_content(
+            "[Desktop Entry]\nName=Test\nExec=test\nType=Application\nCategories=Utility;"
+        )
+        result = self.tab.validate()
+        self.assertTrue(result.is_valid)
+
+    def test_validate_missing_field(self):
+        self.tab.set_content("[Desktop Entry]\nExec=test\nType=Application\nCategories=Utility;")
+        result = self.tab.validate()
+        self.assertFalse(result.is_valid)
+
 
 if __name__ == "__main__":
     unittest.main()

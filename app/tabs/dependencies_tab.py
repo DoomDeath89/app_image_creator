@@ -1,6 +1,7 @@
+import os
 import tkinter as tk
 from tkinter import ttk
-import os
+
 
 class DependenciesTab:
     def __init__(self, notebook, mediator):
@@ -49,3 +50,8 @@ class DependenciesTab:
 
     def get_dependencies(self):
         return list(self.deps_listbox.get(0, tk.END))
+
+    def set_dependencies(self, deps):
+        self.clear_dependencies()
+        for dep in deps:
+            self.deps_listbox.insert(tk.END, dep)
