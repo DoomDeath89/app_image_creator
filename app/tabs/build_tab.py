@@ -1,6 +1,8 @@
 import json
 import os
+import shutil
 import subprocess
+import threading
 import tkinter as tk
 from tkinter import filedialog, scrolledtext, messagebox, ttk
 
@@ -20,6 +22,11 @@ class BuildTab:
         self.desktop_handler = DesktopFileHandler()
         self.frame = ttk.Frame(notebook, padding="10")
         notebook.add(self.frame, text="Build AppImage")
+
+        self._build_process = None
+        self._build_thread = None
+        self._builder = None
+        self._appdir_path = None
 
         self._build_ui()
         self.exe_entry.focus()
@@ -69,7 +76,10 @@ class BuildTab:
         button_frame.pack(fill=tk.X, pady=10)
         ttk.Button(button_frame, text="Save Config", command=self._save_config).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(button_frame, text="Load Config", command=self._load_config).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame, text="Generate AppImage", command=self.build_appimage).pack(side=tk.LEFT)
+        self.generate_button = ttk.Button(button_frame, text="Generate AppImage", command=self.build_appimage)
+        self.generate_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.cancel_button = ttk.Button(button_frame, text="Cancel", command=self._cancel_build, state=tk.DISABLED)
+        self.cancel_button.pack(side=tk.LEFT)
 
         linuxdeploy_frame = ttk.Frame(self.frame)
         linuxdeploy_frame.pack(fill=tk.X, pady=5)
@@ -82,8 +92,13 @@ class BuildTab:
         )
         self.install_linuxdeploy_button.pack(side=tk.RIGHT)
 
-        ttk.Label(self.frame, text="Build Log:").pack(anchor=tk.W, pady=(10, 5))
-        self.log_text = scrolledtext.ScrolledText(self.frame, width=85, height=15)
+        log_frame = ttk.Frame(self.frame)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 5))
+        log_header = ttk.Frame(log_frame)
+        log_header.pack(fill=tk.X)
+        ttk.Label(log_header, text="Build Log:").pack(side=tk.LEFT)
+        ttk.Button(log_header, text="Clear", command=self._clear_log).pack(side=tk.RIGHT)
+        self.log_text = scrolledtext.ScrolledText(log_frame, width=85, height=15)
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
     def select_executable(self):
@@ -104,8 +119,11 @@ class BuildTab:
     def log_message(self, message):
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
-        self.frame.update()
+        self.frame.update_idletasks()
         self.mediator.update_status(message)
+
+    def _clear_log(self):
+        self.log_text.delete("1.0", tk.END)
 
     def _update_linuxdeploy_status(self):
         if self.linuxdeploy.is_available():
@@ -133,8 +151,12 @@ class BuildTab:
             'executable_path': self.exe_entry.get(),
             'icon_path': self.icon_entry.get(),
         }
-        with open(path, 'w') as f:
-            json.dump(config, f, indent=2)
+        try:
+            with open(path, 'w') as f:
+                json.dump(config, f, indent=2)
+            self.log_message(f"Configuration saved to {path}")
+        except (OSError, IOError) as e:
+            messagebox.showerror("Error", f"Failed to save configuration:\n{e}")
 
     def _load_config(self):
         path = filedialog.askopenfilename(
@@ -145,25 +167,34 @@ class BuildTab:
             self._load_config_from_file(path)
 
     def _load_config_from_file(self, path):
-        with open(path, 'r') as f:
-            config = json.load(f)
+        try:
+            with open(path, 'r') as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, ValueError) as e:
+            messagebox.showerror("Error", f"Invalid JSON file:\n{e}")
+            return
+        except (OSError, IOError) as e:
+            messagebox.showerror("Error", f"Failed to read file:\n{e}")
+            return
 
         self.name_entry.delete(0, tk.END)
-        self.name_entry.insert(0, config.get('name', ''))
+        self.name_entry.insert(0, str(config.get('name', '')))
 
         self.version_entry.delete(0, tk.END)
-        self.version_entry.insert(0, config.get('version', ''))
+        self.version_entry.insert(0, str(config.get('version', '')))
 
         self.category_var.set(config.get('category', ''))
 
         self.comment_entry.delete(0, tk.END)
-        self.comment_entry.insert(0, config.get('comment', ''))
+        self.comment_entry.insert(0, str(config.get('comment', '')))
 
         self.exe_entry.delete(0, tk.END)
-        self.exe_entry.insert(0, config.get('executable_path', ''))
+        self.exe_entry.insert(0, str(config.get('executable_path', '')))
 
         self.icon_entry.delete(0, tk.END)
-        self.icon_entry.insert(0, config.get('icon_path', ''))
+        self.icon_entry.insert(0, str(config.get('icon_path', '')))
+
+        self.log_message(f"Configuration loaded from {path}")
 
     def _prompt_install_linuxdeploy(self):
         if self.linuxdeploy.is_available():
@@ -182,7 +213,41 @@ class BuildTab:
             messagebox.showerror("Error", "linuxdeploy installation failed. Check the log for details.")
         self._update_linuxdeploy_status()
 
+    def _set_build_state(self, building: bool):
+        state = tk.DISABLED if building else tk.NORMAL
+        self.generate_button.config(state=state)
+        self.cancel_button.config(state=tk.NORMAL if building else tk.DISABLED)
+
+    def _cancel_build(self):
+        if self._build_process and self._build_process.poll() is None:
+            self.log_message("Cancelling build...")
+            self._build_process.terminate()
+            try:
+                self._build_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._build_process.kill()
+        if self._builder:
+            self._builder.cleanup()
+            self._builder = None
+        self._build_process = None
+        self._set_build_state(False)
+        self.log_message("Build cancelled.")
+
+    def _run_build(self):
+        try:
+            self._execute_build()
+        except Exception as e:
+            self.log_message(f"Unexpected error: {e}")
+            messagebox.showerror("Error", f"Build failed:\n{e}")
+        finally:
+            self._build_process = None
+            self._build_thread = None
+            self.frame.after(0, lambda: self._set_build_state(False))
+
     def build_appimage(self):
+        if self._build_thread and self._build_thread.is_alive():
+            return
+
         exe = self.exe_entry.get().strip()
         icon = self.icon_entry.get().strip()
         name = self.name_entry.get().strip()
@@ -201,6 +266,20 @@ class BuildTab:
             messagebox.showerror("Error", f"Icon file not found: {icon}")
             return
 
+        self._clear_log()
+        self._set_build_state(True)
+
+        self._build_thread = threading.Thread(target=self._run_build, daemon=True)
+        self._build_thread.start()
+
+    def _execute_build(self):
+        exe = self.exe_entry.get().strip()
+        icon = self.icon_entry.get().strip()
+        name = self.name_entry.get().strip()
+        version = self.version_entry.get().strip() or DEFAULT_APP_VERSION
+        category = self.category_var.get().strip()
+        comment = self.comment_entry.get().strip()
+
         config = BuildConfig(
             name=name,
             version=version,
@@ -211,57 +290,77 @@ class BuildTab:
         )
 
         desktop_content = self.desktop_handler.generate(config)
-        self.mediator.set_desktop_content(desktop_content)
+        self.frame.after(0, lambda: self.mediator.set_desktop_content(desktop_content))
 
-        validation = self.mediator.validate_desktop_file()
+        validation = self.desktop_handler.validate(desktop_content)
         if not validation.is_valid:
-            messagebox.showerror("Error", "Desktop file validation failed. Please fix the errors before building.")
+            self.log_message(f"Desktop file validation failed: {validation.summary}")
             return
 
         dependencies = self.mediator.get_dependencies()
 
-        builder = AppDirBuilder(base_dir=Path.cwd())
-        appdir = builder.create(config)
+        self._builder = AppDirBuilder(base_dir=Path.cwd())
+        self._appdir_path = self._builder.create(config)
 
-        self.log_message(f"Creating AppDir in {appdir}")
+        self.log_message(f"Creating AppDir in {self._appdir_path}")
 
-        builder.add_executable(config.executable_path)
-        builder.add_icon(config.icon_path, name)
-        desktop_path = builder.create_desktop_file(config, desktop_content)
+        self._builder.add_executable(config.executable_path)
+        self._builder.add_icon(config.icon_path, name)
+        desktop_path = self._builder.create_desktop_file(config, desktop_content)
         self.log_message(f"Desktop file created at {desktop_path}")
 
-        apprun_path = builder.create_apprun_script(config.executable_path.name)
+        apprun_path = self._builder.create_apprun_script(config.executable_path.name)
         self.log_message(f"AppRun created at {apprun_path}")
 
+        for dep in dependencies:
+            dep_path = Path(dep)
+            if dep_path.exists():
+                dest = self._builder.appdir_path / "usr" / "lib" / dep_path.name
+                shutil.copy2(dep_path, dest)
+                self.log_message(f"Added dependency: {dep_path.name}")
+
         if not self.linuxdeploy.ensure_available(log_callback=self.log_message):
-            messagebox.showerror("Error", "linuxdeploy not found. Please install it to create AppImages.")
+            self.log_message("linuxdeploy not found. Please install it to create AppImages.")
+            self._builder.cleanup()
+            self._builder = None
             return
 
         self.log_message("Running linuxdeploy to detect dependencies...")
         cmd = [
             "linuxdeploy",
-            "--appdir", str(appdir),
+            "--appdir", str(self._appdir_path),
             "--output", "appimage",
-            "--executable", str(appdir / "usr/bin" / config.executable_path.name),
-            "--icon-file", str(appdir / "usr/share/icons/hicolor/256x256/apps" / f"{name}.png"),
+            "--executable", str(self._appdir_path / "usr/bin" / config.executable_path.name),
+            "--icon-file", str(self._appdir_path / "usr/share/icons/hicolor/256x256/apps" / f"{name}.png"),
         ]
 
+        for dep in dependencies:
+            dep_path = Path(dep)
+            if dep_path.exists():
+                cmd.extend(["--library", str(dep_path)])
+
         self.log_message(f"Executing: {' '.join(cmd)}")
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        self._build_process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+
         output = ""
-        for line in iter(process.stdout.readline, ''):
+        for line in iter(self._build_process.stdout.readline, ''):
             if line:
                 output += line
-                self.log_message(line.strip())
-        process.stdout.close()
-        process.wait()
+                self.frame.after(0, lambda m=line.strip(): self.log_message(m))
+        self._build_process.stdout.close()
+        self._build_process.wait()
 
-        if process.returncode != 0:
+        if self._build_process.returncode != 0:
             self.log_message("Error during AppImage creation.")
             if "contains an unregistered value" in output:
                 self.log_message("It seems there's an issue with the desktop file categories.")
                 self.log_message("Please check the Desktop File Validator tab for details.")
+            self._builder.cleanup()
+            self._builder = None
             return
 
         self.log_message("AppImage generated successfully!")
-        messagebox.showinfo("Success", "AppImage generated successfully!")
+        self.frame.after(0, lambda: messagebox.showinfo("Success", "AppImage generated successfully!"))
+        self._builder = None
