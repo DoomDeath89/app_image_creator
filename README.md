@@ -1,6 +1,6 @@
-# AppImage Builder
+# App Image Creator
 
-A Tkinter GUI application to create AppImages using linuxdeploy. Features include a .desktop file validator, dependency management, and configuration save/load.
+A tkinter-based desktop GUI application for creating AppImages on Linux. Simplifies the AppImage creation process with an intuitive interface, automatic dependency detection, and configuration management.
 
 ## Features
 
@@ -9,12 +9,9 @@ A Tkinter GUI application to create AppImages using linuxdeploy. Features includ
 - **Dependencies Manager**: Add extra library dependencies
 - **Save/Load Configuration**: Export and import build configurations as JSON
 - **Auto-install linuxdeploy**: Install linuxdeploy directly from the GUI
-
-## Requirements
-
-- Python 3.8+
-- Tkinter (usually included with Python on Linux)
-- linuxdeploy (can be installed from the GUI)
+- **Non-blocking Builds**: Build process runs in background thread
+- **Cancel Support**: Abort running builds at any time
+- **Error Handling**: User-friendly error messages and recovery
 
 ## Installation
 
@@ -23,7 +20,7 @@ A Tkinter GUI application to create AppImages using linuxdeploy. Features includ
 ```bash
 git clone https://github.com/DoomDeath89/app_image_creator.git
 cd app_image_creator
-python run_app.py
+python3 run_app.py
 ```
 
 ### With Virtual Environment (Recommended)
@@ -36,131 +33,208 @@ source venv/bin/activate
 python run_app.py
 ```
 
-## Usage Manual
+### System Requirements
 
-### 1. Build Tab
+- Python 3.8+
+- tkinter (usually included with Python on Linux)
+- Linux with X11 or Wayland display server
 
-The main tab for creating AppImages.
+## Usage
 
-#### Required Fields
+### Build Tab
 
-| Field | Description |
-|-------|-------------|
-| **Executable** | Path to your Linux binary. Click "Browse" to select. |
-| **Icon** | Path to a .png icon file. Click "Browse" to select. |
-| **App Name** | Name of your application (auto-filled from executable). |
-| **Version** | Application version (default: 1.0). |
-| **Category** | Application category from the dropdown. |
-| **Comment** | Short description of your application. |
+1. **Select Executable**: Click "Browse" to select your Linux binary
+2. **Select Icon**: Click "Browse" to select a .png icon file
+3. **Fill Metadata**: Enter app name, version, category, and comment
+4. **Add Dependencies** (optional): Switch to Dependencies tab to add libraries
+5. **Generate**: Click "Generate AppImage" to start the build process
 
-#### Buttons
+### Desktop File Validator Tab
 
-- **Save Config**: Export current configuration to a .json file
-- **Load Config**: Import configuration from a .json file
-- **Generate AppImage**: Start the AppImage build process
+- View and edit the generated .desktop file content
+- Click "Validate Desktop File" to check for errors
+- Fix any issues before building
 
-#### Build Process
+### Dependencies Tab
 
-1. Fill in all required fields
-2. Click "Generate AppImage"
-3. Monitor progress in the Build Log
-4. The AppImage will be created in the current directory
+- Click "Add" to select library files (.so)
+- Select and click "Remove" to delete selected dependencies
+- Click "Clear" to remove all dependencies
+- Click "Sort" to alphabetize the list
 
-### 2. Desktop File Validator Tab
+### Configuration
 
-Validate your .desktop file content before building.
+- **Save Config**: Export current settings to JSON file
+- **Load Config**: Import settings from JSON file
+- Configs include: executable path, icon path, name, version, category, comment
 
-- Paste or edit your .desktop file content
-- Click "Validate Desktop File"
-- View validation results (errors in red, warnings in orange)
+## Architecture
 
-### 3. Dependencies Tab
+```
+app/
+├── core/
+│   ├── main.py              # Window setup, notebook, mediator
+│   └── mediator.py          # Cross-tab communication
+├── tabs/
+│   ├── build_tab.py         # Main build UI
+│   ├── validator_tab.py     # Desktop file validator
+│   └── dependencies_tab.py  # Dependency list manager
+├── services/
+│   ├── app_dir_builder.py   # AppDir creation
+│   ├── desktop_file_handler.py  # .desktop file logic
+│   └── linux_deploy_manager.py  # linuxdeploy management
+└── utils/
+    ├── constants.py         # App constants
+    └── types.py             # Dataclasses
+```
 
-Add extra library dependencies if needed.
+### Design Patterns
 
-- Click "Add" to select dependency files
-- Use "Sort" to alphabetize the list
-- Select items and click "Remove Selected" to delete
-- Click "Clear All" to remove all dependencies
+- **Mediator Pattern**: Tabs communicate through a central mediator
+- **Service Layer**: Business logic separated from UI components
+- **Thread Safety**: Build process runs in background thread
 
-### 4. Save/Load Configuration
+## Development
 
-#### Save Configuration
+### Git Workflow (GitFlow)
 
-1. Click "Save Config" in the Build tab
-2. Choose a location and filename (.json)
-3. Your current configuration is saved
+This project follows GitFlow branching strategy:
 
-#### Load Configuration
+- **main**: Production-ready code
+- **develop**: Integration branch
+- **feature/***: New features
+- **release/***: Release preparation
+- **hotfix/***: Emergency fixes
 
-1. Click "Load Config" in the Build tab
-2. Select a previously saved .json file
-3. All fields are populated automatically
+### Commit Convention
 
-#### Configuration File Format
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat: add new feature
+fix: resolve bug
+docs: update documentation
+test: add tests
+chore: maintenance tasks
+```
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install pytest
+
+# Run all tests
+python -m pytest tests/ -v
+
+# Run specific test file
+python -m pytest tests/test_build_tab.py -v
+
+# Run with coverage
+python -m pytest tests/ --cov=app
+```
+
+### Code Style
+
+- Follow PEP 8
+- Use type hints
+- Add docstrings for public methods
+- Keep functions focused and small
+
+## Configuration
+
+### Build Config JSON
 
 ```json
 {
   "name": "MyApp",
   "version": "1.0",
   "category": "Game",
-  "comment": "My awesome application",
-  "executable_path": "/path/to/executable",
-  "icon_path": "/path/to/icon.png"
+  "comment": "My awesome app",
+  "executable_path": "/usr/bin/myapp",
+  "icon_path": "/usr/share/icon.png"
 }
 ```
 
-## Install linuxdeploy
+### linuxdeploy
 
-### Option 1: From the GUI
+The app automatically detects and installs linuxdeploy:
+- **x86_64**: Downloads amd64 version
+- **ARM64**: Downloads arm64 version
+- Requires `pkexec` for installation (polkit)
 
-1. If linuxdeploy is not installed, you'll see "linuxdeploy: not found" in red
-2. Click "Install linuxdeploy"
-3. Confirm the installation
-4. Enter your password when prompted
+## Troubleshooting
 
-### Option 2: Using the Script
+### Build Fails
+
+1. Check the Build Log for error messages
+2. Verify executable exists and is runnable
+3. Verify icon is a valid .png file
+4. Ensure linuxdeploy is installed (check status in Build tab)
+
+### UI Freezes
+
+This should not happen in v1.1.0+. If it does:
+1. Kill the process externally
+2. Check for zombie processes: `ps aux | grep linuxdeploy`
+3. Report issue with logs
+
+### Dependencies Not Included
+
+1. Ensure dependencies are added in Dependencies tab
+2. Check Build Log for copy operations
+3. Verify library files exist and are readable
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Setup
 
 ```bash
-./install_appimage_tools.sh
-```
-
-## Project Structure
-
-```
-app_image_creator/
-├── app/
-│   ├── core/           # Main app and mediator
-│   ├── tabs/           # UI components
-│   ├── services/       # Business logic
-│   └── utils/          # Constants and types
-├── tests/              # Test suite
-├── docs/specs/         # Feature specifications
-├── run_app.py          # Entry point
-└── pyproject.toml      # Package configuration
-```
-
-## Development
-
-```bash
+git clone https://github.com/DoomDeath89/app_image_creator.git
+cd app_image_creator
 python3 -m venv venv
 source venv/bin/activate
-pip install -e .
-```
-
-## Testing
-
-```bash
 pip install pytest
-pytest
+python -m pytest tests/ -v
 ```
-
-## Supported Categories
-
-- AudioVideo, Audio, Video, Graphics, Office
-- Development, Education, Game, Network
-- Settings, System, Utility
 
 ## License
 
-MIT. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [AppImage](https://appimage.org/) - The AppImage format
+- [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy) - The build tool
+- [AppImageKit](https://github.com/AppImage/AppImageKit) - Original AppImage tools
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes.
+
+## Version History
+
+| Version | Date | Description |
+|---------|------|-------------|
+| 1.1.0 | 2026-08-26 | Threading, error handling, UX improvements |
+| 1.0.0 | 2026-08-25 | Initial release |
+
+## Support
+
+- [GitHub Issues](https://github.com/DoomDeath89/app_image_creator/issues)
+- [Documentation](https://github.com/DoomDeath89/app_image_creator/tree/main/docs)
+
+## Roadmap
+
+- [ ] Drag-and-drop support for files
+- [ ] Progress bar during build
+- [ ] Batch AppImage creation
+- [ ] Custom linuxdeploy plugins
+- [ ] Theme support (dark mode)
+- [ ] Internationalization (i18n)
